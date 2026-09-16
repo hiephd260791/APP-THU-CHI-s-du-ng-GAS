@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.1/chart.umd.min.js"></script>
+  <style>
+    :root{
+      --primary:#4F46E5; --primary-light:#EEF2FF;
+      --income:#16A34A; --income-light:#DCFCE7;
+      --expense:#DC2626; --expense-light:#FEE2E2;
+      --warn:#F59E0B; --warn-light:#FEF3C7;
+      --bg:#F5F7FB; --card:#FFFFFF; --border:#E5E7EB;
+      --text:#111827; --muted:#6B7280;
+    }
+    *{box-sizing:border-box;}
+    body{
+      margin:0; background:var(--bg); color:var(--text);
+      font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+      -webkit-font-smoothing:antialiased;
+    }
+    .wrap{max-width:1200px;margin:0 auto;padding:20px 24px 60px;}
+    header{
+      display:flex; align-items:center; justify-content:space-between;
+      flex-wrap:wrap; gap:12px; margin-bottom:20px;
+    }
+    h1{font-size:22px; font-weight:800; margin:0; display:flex; align-items:center; gap:8px;}
+    .controls{display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
+    select, .btn{
+      font-family:inherit; font-size:14px; font-weight:600;
+      border-radius:10px; border:1px solid var(--border); background:var(--card);
+      padding:9px 14px; cursor:pointer; color:var(--text);
+    }
+    .btn-primary{background:var(--primary); color:#fff; border-color:var(--primary);}
+    .btn-primary:hover{background:#4338CA;}
+    select:focus, .btn:focus{outline:2px solid var(--primary); outline-offset:1px;}
+
+    .kpi-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:18px;}
+    .kpi{background:var(--card); border:1px solid var(--border); border-radius:14px; padding:16px 18px;}
+    .kpi .label{font-size:12px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.03em;}
+    .kpi .value{font-size:22px; font-weight:800; margin-top:6px;}
+    .kpi.income .value{color:var(--income);}
+    .kpi.expense .value{color:var(--expense);}
+    .kpi.balance .value{color:var(--primary);}
+
+    .grid{display:grid; grid-template-columns:2fr 1fr; gap:16px; margin-bottom:16px;}
+    .card{background:var(--card); border:1px solid var(--border); border-radius:16px; padding:18px 20px;}
+    .card h2{font-size:15px; font-weight:700; margin:0 0 12px; display:flex; align-items:center; justify-content:space-between; gap:8px;}
+    .card h2 small{font-weight:500; color:var(--muted); font-size:12px;}
+
+    .chart-box{position:relative; height:260px;}
+    .chart-box.tall{height:300px;}
+
+    .budget-alert{
+      display:none; align-items:center; gap:10px; padding:10px 14px; border-radius:10px;
+      font-size:13px; font-weight:600; margin-bottom:12px;
+    }
+    .budget-alert.show{display:flex;}
+    .budget-alert.warn{background:var(--warn-light); color:#92400E;}
+    .budget-alert.danger{background:var(--expense-light); color:#991B1B;}
+
+    .progress-track{width:100%; height:16px; background:#F1F5F9; border-radius:999px; overflow:hidden; border:1px solid var(--border);}
+    .progress-fill{height:100%; border-radius:999px; transition:width .4s ease, background .4s ease;}
+    .progress-meta{display:flex; justify-content:space-between; font-size:12.5px; color:var(--muted); margin-top:8px; font-weight:600;}
+
+    .kpi .delta{font-size:11.5px; font-weight:700; margin-top:5px;}
+    .delta-good{color:var(--income);}
+    .delta-bad{color:var(--expense);}
+    .delta-muted{color:var(--muted); font-weight:600;}
+
+    .cat-budget-item{margin-bottom:16px;}
+    .cat-budget-item:last-child{margin-bottom:0;}
+    .cat-budget-head{display:flex; justify-content:space-between; align-items:baseline; font-size:13.5px; font-weight:600; margin-bottom:6px;}
+    .cat-budget-head .amt-meta{color:var(--muted); font-weight:600; font-size:12.5px;}
+
+    tbody tr.stale-row td{background:var(--expense-light); color:#991B1B;}
+    .stale-tag{display:inline-block; margin-left:6px; padding:1px 7px; border-radius:999px; background:var(--expense); color:#fff; font-size:10.5px; font-weight:700;}
+
+    .add-form{background:#FAFAFB; border:1px dashed var(--border); border-radius:12px; padding:14px;}
+    .add-form-title{font-size:12px; font-weight:700; color:var(--muted); margin-bottom:10px; text-transform:uppercase; letter-spacing:.03em;}
+    .add-form-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:8px;}
+    .add-form-grid input, .add-form-grid select{
+      width:100%; font-family:inherit; font-size:13.5px; padding:9px 10px; border-radius:8px;
+      border:1px solid var(--border); background:#fff; color:var(--text);
+    }
+    .add-form-grid input:focus, .add-form-grid select:focus{outline:2px solid var(--primary); outline-offset:1px;}
+    .add-form-grid button{border:none; background:var(--primary); color:#fff; font-weight:700; border-radius:8px; cursor:pointer;}
+    .mini-btn{padding:5px 10px; border-radius:8px; border:1px solid var(--border); background:#fff; font-size:11.5px; font-weight:700; cursor:pointer; color:var(--primary); white-space:nowrap;}
+    .mini-btn:hover{background:var(--primary-light);}
+    .mini-btn:disabled{opacity:.6; cursor:default;}
+
+    @media (max-width:700px){ .add-form-grid{grid-template-columns:1fr 1fr;} }
+
+    table{width:100%; border-collapse:collapse; font-size:13.5px;}
+    thead th{
+      text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.03em;
+      color:var(--muted); font-weight:700; padding:8px 10px; border-bottom:2px solid var(--border);
+      position:sticky; top:0; background:var(--card);
+    }
+    tbody td{padding:9px 10px; border-bottom:1px solid #F1F3F5;}
+    tbody tr:hover{background:#FAFAFB;}
+    .badge{display:inline-block; padding:2px 9px; border-radius:999px; font-size:11.5px; font-weight:700;}
+    .badge.thu{background:var(--income-light); color:var(--income);}
+    .badge.chi{background:var(--expense-light); color:var(--expense);}
+    .amt.thu{color:var(--income); font-weight:700;}
+    .amt.chi{color:var(--expense); font-weight:700;}
+    .table-wrap{max-height:360px; overflow-y:auto; border-radius:10px;}
+    .empty{text-align:center; color:var(--muted); padding:30px 0; font-size:13.5px;}
+
+    .footer-note{text-align:center; color:var(--muted); font-size:12px; margin-top:24px;}
+
+    @media (max-width:880px){
+      .kpi-grid{grid-template-columns:repeat(2,1fr);}
+      .grid{grid-template-columns:1fr;}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>📊 Dashboard Chi tiêu gia đình</h1>
+      <div class="controls">
+        <select id="yearSelect"></select>
+        <select id="monthSelect"></select>
+        <button class="btn btn-primary" id="openFormBtn">✏️ Nhập chi tiêu</button>
+      </div>
+    </header>
+
+    <div class="kpi-grid">
+      <div class="kpi income"><div class="label">Tổng thu (năm)</div><div class="value" id="kpiIncome">–</div></div>
+      <div class="kpi expense"><div class="label">Tổng chi (năm)</div><div class="value" id="kpiExpense">–</div></div>
+      <div class="kpi balance"><div class="label">Số dư (năm)</div><div class="value" id="kpiBalance">–</div></div>
+      <div class="kpi"><div class="label">Chi ăn uống tháng này</div><div class="value" id="kpiFood">–</div></div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px;">
+      <h2>💹 Tổng quan tháng này <small id="monthLabelOverview">so với tháng trước (MoM)</small></h2>
+      <div class="kpi-grid">
+        <div class="kpi income">
+          <div class="label">Thu tháng này</div>
+          <div class="value" id="kpiMonthIncome">–</div>
+          <div class="delta" id="deltaMonthIncome"></div>
+        </div>
+        <div class="kpi expense">
+          <div class="label">Chi tháng này</div>
+          <div class="value" id="kpiMonthExpense">–</div>
+          <div class="delta" id="deltaMonthExpense"></div>
+        </div>
+        <div class="kpi balance">
+          <div class="label">Tiết kiệm tháng này</div>
+          <div class="value" id="kpiMonthSavings">–</div>
+          <div class="delta" id="deltaMonthSavings"></div>
+        </div>
+        <div class="kpi">
+          <div class="label">Tỷ lệ tiết kiệm</div>
+          <div class="value" id="kpiSavingsRate">–</div>
+          <div class="delta" id="deltaSavingsRate"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px;">
+      <h2>📅 Tổng quan thu – chi theo tháng <small id="yearLabel"></small></h2>
+      <div class="chart-box tall"><canvas id="yearChart"></canvas></div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h2>🍱 Ngân sách ăn uống <small>Siêu thị + Combini + Ăn với công ty</small></h2>
+        <div id="budgetAlert" class="budget-alert"></div>
+        <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+        <div class="progress-meta">
+          <span id="progressText">–</span>
+          <span id="progressLimit">–</span>
+        </div>
+        <div class="chart-box" style="margin-top:16px;"><canvas id="foodChart"></canvas></div>
+      </div>
+      <div class="card">
+        <h2>🥧 Cơ cấu chi tiêu <small id="monthLabelPie"></small></h2>
+        <div class="chart-box"><canvas id="pieChart"></canvas></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px;">
+      <h2>🎯 Ngân sách theo danh mục <small id="monthLabelCatBudget"></small></h2>
+      <div id="categoryBudgetList"></div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px;">
+      <h2>📈 Xu hướng nhiều năm theo danh mục
+        <select id="trendCategorySelect" style="font-size:13px; font-weight:600; padding:6px 10px;"></select>
+      </h2>
+      <div class="chart-box tall"><canvas id="trendChart"></canvas></div>
+    </div>
+
+    <div class="card">
+      <h2>📋 Chi tiết giao dịch <small id="monthLabelTable"></small></h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Ngày</th><th>Loại</th><th>Danh mục</th><th style="text-align:right;">Số tiền</th><th>Ghi chú</th></tr></thead>
+          <tbody id="txBody"></tbody>
+        </table>
+      </div>
+      <div id="emptyState" class="empty" style="display:none;">Chưa có giao dịch nào trong tháng này.</div>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+      <h2>📦 Lời lãi kinh doanh Tenpai <small>Khớp theo Tên sản phẩm · gồm mua thường + Lottery/PSA + bóc pack combini · lời/lãi tính vào quý bán hàng</small></h2>
+
+      <div class="kpi-grid" style="margin-bottom:18px;">
+        <div class="kpi income"><div class="label">Tổng doanh thu</div><div class="value" id="tenpaiRevenue">–</div></div>
+        <div class="kpi expense"><div class="label">Tổng chi phí</div><div class="value" id="tenpaiCost">–</div></div>
+        <div class="kpi balance"><div class="label">Tổng lời lãi (đã khớp)</div><div class="value" id="tenpaiProfit">–</div></div>
+        <div class="kpi"><div class="label">Vốn đang chờ bán</div><div class="value" id="tenpaiPending">–</div></div>
+      </div>
+
+      <div class="chart-box tall" style="margin-bottom:20px;"><canvas id="tenpaiChart"></canvas></div>
+
+      <h2 style="font-size:14px;">✅ Đã bán — theo món hàng</h2>
+      <div class="table-wrap" style="max-height:260px; margin-bottom:20px;">
+        <table>
+          <thead><tr><th>Tên sản phẩm</th><th style="text-align:right;">Chi phí</th><th style="text-align:right;">Doanh thu</th><th style="text-align:right;">Lời/lỗ</th><th style="text-align:right;">% lãi</th><th>Ngày bán gần nhất</th></tr></thead>
+          <tbody id="tenpaiSoldBody"></tbody>
+        </table>
+        <div id="tenpaiSoldEmpty" class="empty" style="display:none;">Chưa có món hàng nào khớp được lời lãi (cần nhập đủ cả dòng mua và dòng bán cùng tên sản phẩm).</div>
+      </div>
+
+      <h2 style="font-size:14px;">⏳ Đang chờ bán</h2>
+      <div id="tenpaiStaleAlert" class="budget-alert warn" style="margin-bottom:12px;"></div>
+      <div class="table-wrap" style="max-height:200px;">
+        <table>
+          <thead><tr><th>Tên sản phẩm</th><th style="text-align:right;">Vốn đã bỏ ra</th><th>Ngày mua gần nhất</th><th style="text-align:right;">Số ngày chờ</th></tr></thead>
+          <tbody id="tenpaiPendingBody"></tbody>
+        </table>
+        <div id="tenpaiPendingEmpty" class="empty" style="display:none;">Không có hàng nào đang chờ bán.</div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+      <h2>💸 Quản lý cho vay <small>Cảnh báo khi quá Hạn trả + 15 ngày mà chưa thu hồi</small></h2>
+
+      <div class="kpi-grid" style="margin-bottom:16px;">
+        <div class="kpi balance"><div class="label">Đang cho vay</div><div class="value" id="lendingTotal">–</div></div>
+        <div class="kpi expense"><div class="label">Quá hạn (15+ ngày)</div><div class="value" id="lendingOverdueTotal">–</div></div>
+      </div>
+      <div id="lendingOverdueAlert" class="budget-alert danger" style="margin-bottom:12px;"></div>
+
+      <div class="table-wrap" style="max-height:260px; margin-bottom:16px;">
+        <table>
+          <thead><tr><th>Người vay</th><th style="text-align:right;">Số tiền</th><th>Ngày cho vay</th><th>Hạn trả</th><th>Trạng thái</th><th></th></tr></thead>
+          <tbody id="lendingBody"></tbody>
+        </table>
+        <div id="lendingEmpty" class="empty" style="display:none;">Chưa có khoản cho vay nào.</div>
+      </div>
+
+      <div class="add-form">
+        <div class="add-form-title">➕ Thêm khoản cho vay mới</div>
+        <div class="add-form-grid">
+          <input type="text" id="lendingBorrowerInput" placeholder="Tên người vay">
+          <input type="text" inputmode="numeric" id="lendingAmountInput" placeholder="Số tiền (¥)">
+          <input type="date" id="lendingDateInput" title="Ngày cho vay">
+          <input type="date" id="lendingDueDateInput" title="Hạn trả (tuỳ chọn)">
+          <input type="text" id="lendingNoteInput" placeholder="Ghi chú (tuỳ chọn)">
+          <button type="button" id="lendingAddBtn">💾 Lưu</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+      <h2>🎯 Theo dõi Lottery (Chusen) & Chấm PSA <small>Chi phí đã được tính vào Tenpai ngay lúc trả tiền</small></h2>
+
+      <div id="trackingOverdueAlert" class="budget-alert warn" style="margin-bottom:12px;"></div>
+
+      <div class="table-wrap" style="max-height:260px; margin-bottom:16px;">
+        <table>
+          <thead><tr><th>Loại</th><th>Tên sản phẩm</th><th style="text-align:right;">Số tiền</th><th>Ngày dự kiến về</th><th>Trạng thái</th><th></th></tr></thead>
+          <tbody id="trackingBody"></tbody>
+        </table>
+        <div id="trackingEmpty" class="empty" style="display:none;">Chưa có đơn Lottery/PSA nào đang theo dõi.</div>
+      </div>
+
+      <div class="add-form">
+        <div class="add-form-title">➕ Thêm đơn theo dõi mới</div>
+        <div class="add-form-grid">
+          <select id="trackingTypeInput">
+            <option value="Lottery (Chusen)">🎟️ Lottery (Chusen)</option>
+            <option value="Chấm PSA">🎴 Chấm PSA</option>
+          </select>
+          <input type="text" id="trackingNameInput" list="productNameListDash" placeholder="Tên sản phẩm">
+          <input type="text" inputmode="numeric" id="trackingAmountInput" placeholder="Số tiền đã trả (¥)">
+          <input type="date" id="trackingDateInput" title="Ngày trả tiền">
+          <input type="date" id="trackingExpectedInput" title="Ngày dự kiến về (tuỳ chọn)">
+          <input type="text" id="trackingNoteInput" placeholder="Ghi chú (tuỳ chọn)">
+          <button type="button" id="trackingAddBtn">💾 Lưu</button>
+        </div>
+        <datalist id="productNameListDash"></datalist>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+      <h2>⚙️ Cài đặt báo cáo <small>Email nhận báo cáo tuần / nhắc nhập liệu / báo cáo cuối ngày</small></h2>
+      <div class="add-form">
+        <div class="add-form-title">Để trống = dùng email tài khoản Google đang mở Sheet này</div>
+        <div class="add-form-grid" style="grid-template-columns:2fr 1fr;">
+          <input type="text" id="reportEmailInput" placeholder="vd: giadinh@gmail.com">
+          <button type="button" id="reportEmailSaveBtn">💾 Lưu</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer-note">Dữ liệu đồng bộ trực tiếp từ Google Sheet · Cập nhật realtime mỗi khi mở lại trang</div>
+  </div>
+
+<script>
+const CATEGORY_ICONS = {
+  'Tiền lương':'💼','Tiền thưởng':'🎁','Tiền tenpai':'🛍️',
+  'Tiền siêu thị':'🛒','Tiền combini':'🏪','Tiền xăng':'⛽','Tiền dầu xe ô tô':'🛢️',
+  'Tiền điện':'⚡','Nước':'💧','Gas':'🔥','Internet':'🌐','Điện thoại':'📱',
+  'Tiền mua đồ tenpai':'📦','Tiền gửi chăm con':'👶','Tiền gửi bố mẹ':'👨‍👩‍👧','Tiền ăn với công ty':'🍱'
+};
+const TYPE_INCOME = 'Thu nhập';
+const TYPE_EXPENSE = 'Chi tiêu';
+const MONTH_LABELS = Array.from({length:12}, (_,i) => 'T' + (i+1));
+
+let dashData = null;
+let trendData = null;
+let selectedMonth = new Date().getMonth() + 1;
+let yearChart, foodChart, pieChart, tenpaiChart, trendChart;
+
+function fmt(n){ return '¥' + Math.round(n || 0).toLocaleString('ja-JP'); }
+
+// So sánh giá trị tháng hiện tại với tháng trước (MoM). higherIsBetter=false dùng
+// cho chi tiêu (chi tăng là xấu). isPercent=true khi so 2 con số % (đpt = điểm phần trăm).
+function deltaHtml(curr, prev, opts){
+  opts = Object.assign({ higherIsBetter:true, isPercent:false }, opts || {});
+  curr = Number(curr) || 0; prev = Number(prev) || 0;
+  const diff = curr - prev;
+  if (Math.abs(diff) < (opts.isPercent ? 0.05 : 1)) {
+    return '<span class="delta-muted">≈ không đổi so với tháng trước</span>';
+  }
+  const isUp = diff > 0;
+  const good = opts.higherIsBetter ? isUp : !isUp;
+  const arrow = isUp ? '▲' : '▼';
+  const cls = good ? 'delta-good' : 'delta-bad';
+  const diffText = opts.isPercent ? Math.abs(diff).toFixed(1) + ' đpt' : fmt(Math.abs(diff));
+  return `<span class="${cls}">${arrow} ${diffText} so với tháng trước</span>`;
+}
+
+// Lấy dữ liệu tháng liền trước selectedMonth (xử lý riêng trường hợp Tháng 1 ->
+// dùng result.prevDecember vì không có "tháng 0" trong mảng monthly của năm nay).
+function getPrevMonthData(){
+  if (selectedMonth === 1) {
+    const pd = dashData.prevDecember || { income:0, expense:0 };
+    const savingsRate = pd.income > 0 ? Math.round(((pd.income - pd.expense) / pd.income) * 1000) / 10 : 0;
+    return { income: pd.income, expense: pd.expense, savingsRate: savingsRate };
+  }
+  return dashData.monthly[selectedMonth - 2] || { income:0, expense:0, savingsRate:0 };
+}
+
+function loadData(year){
+  google.script.run.withSuccessHandler(onDataLoaded).withFailureHandler(onError).getDashboardData(year || null);
+}
+
+function onError(err){
+  console.error(err);
+  document.querySelector('.wrap').insertAdjacentHTML('afterbegin',
+    '<div class="budget-alert danger show">⚠️ Lỗi tải dữ liệu: ' + (err && err.message ? err.message : err) + '</div>');
+}
+
+function onDataLoaded(data){
+  if (!data || data.success === false) return onError(data);
+  dashData = data;
+
+  // Year selector
+  const yearSelect = document.getElementById('yearSelect');
+  yearSelect.innerHTML = data.availableYears.map(y =>
+    `<option value="${y}" ${y === data.year ? 'selected' : ''}>Năm ${y}</option>`).join('');
+  document.getElementById('yearLabel').textContent = 'Năm ' + data.year;
+
+  // Month selector
+  const monthSelect = document.getElementById('monthSelect');
+  const now = new Date();
+  if (!MONTH_LABELS.length) return;
+  if (selectedMonth < 1 || selectedMonth > 12) selectedMonth = now.getMonth() + 1;
+  monthSelect.innerHTML = MONTH_LABELS.map((label, i) =>
+    `<option value="${i+1}" ${ (i+1) === selectedMonth ? 'selected' : ''}>Tháng ${i+1}</option>`).join('');
+
+  renderKpis();
+
+  if (typeof Chart === 'undefined') {
+    document.querySelector('.wrap').insertAdjacentHTML('afterbegin',
+      '<div class="budget-alert danger show">⚠️ Không tải được thư viện biểu đồ (Chart.js) từ CDN. Kiểm tra kết nối mạng / tường lửa, hoặc thử tải lại trang.</div>');
+  } else {
+    try { renderYearChart(); } catch (e) { console.error('renderYearChart error:', e); }
+  }
+  try { renderFoodBudget(); } catch (e) { console.error('renderFoodBudget error:', e); }
+  try { renderMonthDetail(); } catch (e) { console.error('renderMonthDetail error:', e); }
+  try { renderCategoryBudgets(); } catch (e) { console.error('renderCategoryBudgets error:', e); }
+}
+
+function renderKpis(){
+  const totalIncome = dashData.monthly.reduce((s,m) => s + m.income, 0);
+  const totalExpense = dashData.monthly.reduce((s,m) => s + m.expense, 0);
+  document.getElementById('kpiIncome').textContent = fmt(totalIncome);
+  document.getElementById('kpiExpense').textContent = fmt(totalExpense);
+  document.getElementById('kpiBalance').textContent = fmt(totalIncome - totalExpense);
+
+  const foodMonth = dashData.foodBudget.byMonth.find(f => f.month === selectedMonth);
+  document.getElementById('kpiFood').textContent = fmt(foodMonth ? foodMonth.spent : 0);
+
+  // Tổng quan tháng này + so sánh MoM (tỷ lệ tiết kiệm = (thu-chi)/thu, đã tính sẵn ở backend)
+  const mm = dashData.monthly[selectedMonth - 1] || { income:0, expense:0, balance:0, savingsRate:0 };
+  const prev = getPrevMonthData();
+  document.getElementById('monthLabelOverview').textContent = 'Tháng ' + selectedMonth + ' — so với tháng trước (MoM)';
+  document.getElementById('kpiMonthIncome').textContent = fmt(mm.income);
+  document.getElementById('kpiMonthExpense').textContent = fmt(mm.expense);
+  document.getElementById('kpiMonthSavings').textContent = fmt(mm.income - mm.expense);
+  document.getElementById('kpiSavingsRate').textContent = mm.savingsRate + '%';
+
+  document.getElementById('deltaMonthIncome').innerHTML = deltaHtml(mm.income, prev.income, { higherIsBetter:true });
+  document.getElementById('deltaMonthExpense').innerHTML = deltaHtml(mm.expense, prev.expense, { higherIsBetter:false });
+  document.getElementById('deltaMonthSavings').innerHTML = deltaHtml(mm.income - mm.expense, prev.income - prev.expense, { higherIsBetter:true });
+  document.getElementById('deltaSavingsRate').innerHTML = deltaHtml(mm.savingsRate, prev.savingsRate, { higherIsBetter:true, isPercent:true });
+}
+
+function renderCategoryBudgets(){
+  document.getElementById('monthLabelCatBudget').textContent = 'Tháng ' + selectedMonth;
+  const container = document.getElementById('categoryBudgetList');
+  const limits = (dashData.categoryBudgets && dashData.categoryBudgets.limits) || {};
+  const catNames = Object.keys(limits);
+
+  if (!catNames.length){
+    container.innerHTML = '<div class="empty">Chưa thiết lập ngân sách cho danh mục nào. Vào sheet Settings, nhập tên danh mục ở cột F (từ F2) và hạn mức/tháng ở cột G để bật cảnh báo.</div>';
+    return;
+  }
+
+  container.innerHTML = catNames.map(cat => {
+    const limit = Number(limits[cat]) || 0;
+    const byMonth = (dashData.categoryBudgets.byMonth[cat] || []);
+    const entry = byMonth.find(e => e.month === selectedMonth) || { spent:0, percent:0 };
+    const pct = Math.min(entry.percent, 999);
+    const color = pct >= 100 ? '#DC2626' : (pct >= 80 ? '#F59E0B' : '#16A34A');
+    const icon = CATEGORY_ICONS[cat] || '';
+
+    let alertHtml = '';
+    if (pct >= 100){
+      alertHtml = `<div class="budget-alert danger show" style="margin-top:6px;">🚨 Đã VƯỢT ngân sách ${icon} ${cat} (${pct}%)</div>`;
+    } else if (pct >= 80){
+      alertHtml = `<div class="budget-alert warn show" style="margin-top:6px;">⚠️ Sắp đạt giới hạn ${icon} ${cat} (${pct}%) — còn ${fmt(limit - entry.spent)}</div>`;
+    }
+
+    return `
+      <div class="cat-budget-item">
+        <div class="cat-budget-head">
+          <span>${icon} ${cat}</span>
+          <span class="amt-meta">${fmt(entry.spent)} / ${fmt(limit)} (${pct}%)</span>
+        </div>
+        <div class="progress-track"><div class="progress-fill" style="width:${Math.min(pct,100)}%; background:${color};"></div></div>
+        ${alertHtml}
+      </div>`;
+  }).join('');
+}
+
+function renderYearChart(){
+  const ctx = document.getElementById('yearChart').getContext('2d');
+  const incomeData = dashData.monthly.map(m => m.income);
+  const expenseData = dashData.monthly.map(m => m.expense);
+
+  if (yearChart) yearChart.destroy();
+  yearChart = new Chart(ctx, {
+    data: {
+      labels: MONTH_LABELS,
+      datasets: [
+        { type:'bar', label:'Thu nhập', data:incomeData, backgroundColor:'#16A34A', borderRadius:6, maxBarThickness:28 },
+        { type:'bar', label:'Chi tiêu', data:expenseData, backgroundColor:'#DC2626', borderRadius:6, maxBarThickness:28 }
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{position:'top', labels:{usePointStyle:true, boxWidth:8, font:{family:'Inter'}}},
+        tooltip:{ callbacks:{ label:(c) => c.dataset.label + ': ' + fmt(c.raw) } }
+      },
+      scales:{ y:{ ticks:{ callback:(v) => '¥' + (v/1000) + 'k' } } },
+      onClick:(evt, elements) => {
+        if (elements && elements.length){
+          selectedMonth = elements[0].index + 1;
+          document.getElementById('monthSelect').value = selectedMonth;
+          renderKpis(); renderFoodBudget(); renderMonthDetail(); renderCategoryBudgets();
+        }
+      }
+    }
+  });
+}
+
+function renderFoodBudget(){
+  const limit = dashData.foodBudget.limit;
+  const entry = dashData.foodBudget.byMonth.find(f => f.month === selectedMonth) || {spent:0, percent:0};
+  const pct = Math.min(entry.percent, 999);
+
+  const fill = document.getElementById('progressFill');
+  fill.style.width = Math.min(pct, 100) + '%';
+  fill.style.background = pct >= 100 ? '#DC2626' : (pct >= 80 ? '#F59E0B' : '#16A34A');
+
+  document.getElementById('progressText').textContent = fmt(entry.spent) + ' đã chi (' + pct + '%)';
+  document.getElementById('progressLimit').textContent = 'Giới hạn ' + fmt(limit);
+
+  const alertBox = document.getElementById('budgetAlert');
+  if (pct >= 100){
+    alertBox.className = 'budget-alert danger show';
+    alertBox.innerHTML = '🚨 Đã VƯỢT ngân sách ăn uống tháng ' + selectedMonth + '! (' + pct + '%)';
+  } else if (pct >= 80){
+    alertBox.className = 'budget-alert warn show';
+    alertBox.innerHTML = '⚠️ Sắp đạt giới hạn ăn uống tháng ' + selectedMonth + ' (' + pct + '%) — còn ' + fmt(limit - entry.spent);
+  } else {
+    alertBox.className = 'budget-alert';
+    alertBox.innerHTML = '';
+  }
+
+  if (typeof Chart !== 'undefined') {
+    try {
+      const ctx = document.getElementById('foodChart').getContext('2d');
+      const spentData = dashData.foodBudget.byMonth.map(f => f.spent);
+      const limitLine = dashData.foodBudget.byMonth.map(() => limit);
+
+      if (foodChart) foodChart.destroy();
+      foodChart = new Chart(ctx, {
+        data: {
+          labels: MONTH_LABELS,
+          datasets: [
+            { type:'bar', label:'Đã chi ăn uống', data:spentData,
+              backgroundColor: spentData.map(v => v >= limit ? '#DC2626' : (v >= limit*0.8 ? '#F59E0B' : '#93C5FD')),
+              borderRadius:6, maxBarThickness:22 },
+            { type:'line', label:'Giới hạn', data:limitLine, borderColor:'#111827', borderDash:[6,4],
+              pointRadius:0, borderWidth:1.5 }
+          ]
+        },
+        options:{
+          responsive:true, maintainAspectRatio:false,
+          plugins:{ legend:{position:'top', labels:{usePointStyle:true, boxWidth:8, font:{family:'Inter'}}},
+            tooltip:{ callbacks:{ label:(c) => c.dataset.label + ': ' + fmt(c.raw) } } },
+          scales:{ y:{ ticks:{ callback:(v) => '¥' + (v/1000) + 'k' } } }
+        }
+      });
+    } catch (e) { console.error('foodChart error:', e); }
+  }
+}
+
+function renderMonthDetail(){
+  document.getElementById('monthLabelPie').textContent = 'Tháng ' + selectedMonth;
+  document.getElementById('monthLabelTable').textContent = 'Tháng ' + selectedMonth + '/' + dashData.year;
+
+  const monthTx = dashData.transactions.filter(t => t.month === selectedMonth);
+
+  // Pie chart cơ cấu chi
+  const catTotals = {};
+  monthTx.filter(t => t.type === TYPE_EXPENSE).forEach(t => { catTotals[t.category] = (catTotals[t.category]||0) + t.amount; });
+  const labels = Object.keys(catTotals);
+  const values = Object.values(catTotals);
+  const palette = ['#4F46E5','#DC2626','#F59E0B','#16A34A','#0EA5E9','#8B5CF6','#EC4899','#14B8A6','#F97316','#64748B','#84CC16','#EAB308','#6366F1'];
+
+  if (typeof Chart !== 'undefined') {
+    try {
+      const ctx = document.getElementById('pieChart').getContext('2d');
+      if (pieChart) pieChart.destroy();
+      pieChart = new Chart(ctx, {
+        type:'doughnut',
+        data:{ labels: labels.map(l => (CATEGORY_ICONS[l]||'') + ' ' + l), datasets:[{ data:values, backgroundColor: palette, borderWidth:2, borderColor:'#fff' }] },
+        options:{
+          responsive:true, maintainAspectRatio:false,
+          plugins:{ legend:{position:'right', labels:{boxWidth:10, font:{size:11, family:'Inter'}}},
+            tooltip:{ callbacks:{ label:(c) => c.label + ': ' + fmt(c.raw) } } }
+        }
+      });
+    } catch (e) { console.error('pieChart error:', e); }
+  }
+
+  // Bảng chi tiết
+  const tbody = document.getElementById('txBody');
+  const emptyState = document.getElementById('emptyState');
+  if (!monthTx.length){
+    tbody.innerHTML = '';
+    emptyState.style.display = 'block';
+    return;
+  }
+  emptyState.style.display = 'none';
+  tbody.innerHTML = monthTx.map(t => {
+    const isIncome = t.type === TYPE_INCOME;
+    return `
+    <tr>
+      <td>${t.date}</td>
+      <td><span class="badge ${isIncome ? 'thu' : 'chi'}">${isIncome ? 'Thu' : 'Chi'}</span></td>
+      <td>${CATEGORY_ICONS[t.category] || ''} ${t.category}</td>
+      <td style="text-align:right;" class="amt ${isIncome ? 'thu' : 'chi'}">${isIncome ? '+' : '-'}${fmt(t.amount)}</td>
+      <td style="color:#6B7280;">${t.note || ''}</td>
+    </tr>`;
+  }).join('');
+}
+
+document.getElementById('yearSelect').addEventListener('change', (e) => loadData(Number(e.target.value)));
+document.getElementById('monthSelect').addEventListener('change', (e) => {
+  selectedMonth = Number(e.target.value);
+  renderKpis(); renderFoodBudget(); renderMonthDetail(); renderCategoryBudgets();
+});
+document.getElementById('openFormBtn').addEventListener('click', () => {
+  google.script.run.withSuccessHandler((url) => {
+    if (url) { window.open(url + '?page=form', '_blank'); }
+    else { alert('Web app chưa được deploy. Hãy dùng menu 💰 Quản lý chi tiêu > ✏️ Nhập chi tiêu trong Google Sheet.'); }
+  }).getWebAppUrl();
+});
+
+function loadTenpaiReport(){
+  google.script.run
+    .withSuccessHandler(onTenpaiLoaded)
+    .withFailureHandler((err) => console.error('getTenpaiReport failed:', err))
+    .getTenpaiReport();
+}
+
+function onTenpaiLoaded(data){
+  if (!data || data.success === false) { console.error(data); return; }
+
+  document.getElementById('tenpaiRevenue').textContent = fmt(data.totals.revenue);
+  document.getElementById('tenpaiCost').textContent = fmt(data.totals.cost);
+  const profitEl = document.getElementById('tenpaiProfit');
+  profitEl.textContent = (data.totals.profit >= 0 ? '+' : '') + fmt(data.totals.profit);
+  profitEl.style.color = data.totals.profit >= 0 ? '#16A34A' : '#DC2626';
+  document.getElementById('tenpaiPending').textContent = fmt(data.totals.pendingCost);
+
+  if (typeof Chart !== 'undefined' && data.quarters.length) {
+    try {
+      const ctx = document.getElementById('tenpaiChart').getContext('2d');
+      if (tenpaiChart) tenpaiChart.destroy();
+      tenpaiChart = new Chart(ctx, {
+        data: {
+          labels: data.quarters.map(q => q.label),
+          datasets: [
+            { type:'bar', label:'Doanh thu', data:data.quarters.map(q => q.revenue), backgroundColor:'#16A34A', borderRadius:6, maxBarThickness:32 },
+            { type:'bar', label:'Chi phí', data:data.quarters.map(q => q.cost), backgroundColor:'#DC2626', borderRadius:6, maxBarThickness:32 },
+            { type:'line', label:'Lời/lỗ', data:data.quarters.map(q => q.profit), borderColor:'#4F46E5', backgroundColor:'#4F46E5', tension:0.3, pointRadius:4, borderWidth:2 }
+          ]
+        },
+        options:{
+          responsive:true, maintainAspectRatio:false,
+          plugins:{ legend:{position:'top', labels:{usePointStyle:true, boxWidth:8, font:{family:'Inter'}}},
+            tooltip:{ callbacks:{ label:(c) => c.dataset.label + ': ' + fmt(c.raw) } } },
+          scales:{ y:{ ticks:{ callback:(v) => '¥' + (v/1000) + 'k' } } }
+        }
+      });
+    } catch (e) { console.error('tenpaiChart error:', e); }
+  } else if (!data.quarters.length) {
+    document.getElementById('tenpaiChart').getContext('2d').canvas.parentElement.insertAdjacentHTML('afterbegin',
+      '<div class="empty">Chưa có dữ liệu Tenpai nào khớp được để vẽ biểu đồ.</div>');
+  }
+
+  const soldBody = document.getElementById('tenpaiSoldBody');
+  const soldEmpty = document.getElementById('tenpaiSoldEmpty');
+  if (!data.items.length){
+    soldBody.innerHTML = '';
+    soldEmpty.style.display = 'block';
+  } else {
+    soldEmpty.style.display = 'none';
+    soldBody.innerHTML = data.items.map(it => `
+      <tr>
+        <td>${it.name}</td>
+        <td style="text-align:right;">${fmt(it.cost)}</td>
+        <td style="text-align:right;">${fmt(it.revenue)}</td>
+        <td style="text-align:right; font-weight:700; color:${it.profit >= 0 ? '#16A34A' : '#DC2626'};">${it.profit >= 0 ? '+' : ''}${fmt(it.profit)}</td>
+        <td style="text-align:right; font-weight:700; color:${it.profitPercent === null ? '#6B7280' : (it.profitPercent >= 0 ? '#16A34A' : '#DC2626')};">${it.profitPercent === null ? '–' : (it.profitPercent >= 0 ? '+' : '') + it.profitPercent + '%'}</td>
+        <td>${it.lastSaleDate}</td>
+      </tr>`).join('');
+  }
+
+  const staleAlert = document.getElementById('tenpaiStaleAlert');
+  if (data.staleCount > 0){
+    staleAlert.className = 'budget-alert warn show';
+    staleAlert.innerHTML = `⚠️ Có ${data.staleCount} món hàng tồn kho quá ${60} ngày chưa bán được — cân nhắc giảm giá hoặc xử lý sớm để thu hồi vốn.`;
+  } else {
+    staleAlert.className = 'budget-alert';
+    staleAlert.innerHTML = '';
+  }
+
+  const pendingBody = document.getElementById('tenpaiPendingBody');
+  const pendingEmpty = document.getElementById('tenpaiPendingEmpty');
+  if (!data.pending.length){
+    pendingBody.innerHTML = '';
+    pendingEmpty.style.display = 'block';
+  } else {
+    pendingEmpty.style.display = 'none';
+    pendingBody.innerHTML = data.pending.map(p => `
+      <tr class="${p.isStale ? 'stale-row' : ''}">
+        <td>${p.name}${p.isStale ? '<span class="stale-tag">TỒN LÂU</span>' : ''}</td>
+        <td style="text-align:right;">${fmt(p.cost)}</td>
+        <td>${p.lastCostDate}</td>
+        <td style="text-align:right; font-weight:700;">${p.daysSincePurchase === null ? '–' : p.daysSincePurchase + ' ngày'}</td>
+      </tr>`).join('');
+  }
+}
+
+function loadCategoryTrend(){
+  google.script.run
+    .withSuccessHandler(onTrendLoaded)
+    .withFailureHandler((err) => console.error('getCategoryTrend failed:', err))
+    .getCategoryTrend();
+}
+
+function onTrendLoaded(data){
+  if (!data || data.success === false) { console.error(data); return; }
+  trendData = data;
+
+  const select = document.getElementById('trendCategorySelect');
+  const categories = data.categories || []; // phòng trường hợp backend cũ chưa trả field này
+  if (!categories.length){
+    select.innerHTML = '<option>Chưa có dữ liệu</option>';
+    return;
+  }
+  select.innerHTML = categories.map(c => `<option value="${c}">${(CATEGORY_ICONS[c]||'') + ' ' + c}</option>`).join('');
+  renderTrendChart();
+}
+
+function renderTrendChart(){
+  if (!trendData || typeof Chart === 'undefined') return;
+  const cat = document.getElementById('trendCategorySelect').value;
+  const series = trendData.series[cat] || [];
+
+  try {
+    const ctx = document.getElementById('trendChart').getContext('2d');
+    if (trendChart) trendChart.destroy();
+    trendChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: trendData.timeline,
+        datasets: [{
+          label: (CATEGORY_ICONS[cat]||'') + ' ' + cat,
+          data: series,
+          borderColor: '#4F46E5',
+          backgroundColor: 'rgba(79,70,229,0.12)',
+          fill: true, tension: 0.3, pointRadius: 2, borderWidth: 2
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: (c) => fmt(c.raw) } }
+        },
+        scales: {
+          y: { ticks: { callback: (v) => '¥' + (v/1000) + 'k' } },
+          x: { ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } }
+        }
+      }
+    });
+  } catch (e) { console.error('trendChart error:', e); }
+}
+
+document.getElementById('trendCategorySelect').addEventListener('change', renderTrendChart);
+
+function todayStr(){
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+}
+
+// ============================================================
+// QUẢN LÝ CHO VAY
+// ============================================================
+function loadLendingReport(){
+  google.script.run
+    .withSuccessHandler(onLendingLoaded)
+    .withFailureHandler((err) => console.error('getLendingReport failed:', err))
+    .getLendingReport();
+}
+
+function onLendingLoaded(data){
+  if (!data || data.success === false) { console.error(data); return; }
+
+  document.getElementById('lendingTotal').textContent = fmt(data.totals.totalLending);
+  document.getElementById('lendingOverdueTotal').textContent = fmt(data.totals.totalOverdue);
+
+  const alertBox = document.getElementById('lendingOverdueAlert');
+  if (data.totals.overdueCount > 0){
+    alertBox.className = 'budget-alert danger show';
+    alertBox.innerHTML = `🚨 Có ${data.totals.overdueCount} khoản cho vay đã quá Hạn trả + 15 ngày, tổng ${fmt(data.totals.totalOverdue)} — nên nhắc người vay sớm.`;
+  } else {
+    alertBox.className = 'budget-alert'; alertBox.innerHTML = '';
+  }
+
+  const body = document.getElementById('lendingBody');
+  const empty = document.getElementById('lendingEmpty');
+  if (!data.items.length){ body.innerHTML = ''; empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+  body.innerHTML = data.items.map(it => {
+    const status = it.isPaid ? '✅ Đã thu hồi' : (it.isOverdue ? `🚨 Quá hạn ${it.daysOverdue} ngày` : '⏳ Đang cho vay');
+    return `
+    <tr class="${it.isOverdue ? 'stale-row' : ''}">
+      <td>${it.borrower}</td>
+      <td style="text-align:right;">${fmt(it.amount)}</td>
+      <td>${it.lendDate}</td>
+      <td>${it.dueDate || '–'}</td>
+      <td>${status}</td>
+      <td>${it.isPaid ? '' : `<button type="button" class="mini-btn" data-row="${it.rowIndex}">Đã trả</button>`}</td>
+    </tr>`;
+  }).join('');
+  body.querySelectorAll('.mini-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      btn.disabled = true; btn.textContent = '...';
+      google.script.run
+        .withSuccessHandler(() => loadLendingReport())
+        .withFailureHandler((err) => { console.error(err); btn.disabled = false; btn.textContent = 'Đã trả'; })
+        .markLendingPaid(Number(btn.getAttribute('data-row')));
+    });
+  });
+}
+
+document.getElementById('lendingAddBtn').addEventListener('click', () => {
+  const borrower = document.getElementById('lendingBorrowerInput').value.trim();
+  const amount = Number(document.getElementById('lendingAmountInput').value);
+  const lendDate = document.getElementById('lendingDateInput').value;
+  const dueDate = document.getElementById('lendingDueDateInput').value;
+  const note = document.getElementById('lendingNoteInput').value.trim();
+
+  if (!borrower || !amount || amount <= 0 || !lendDate){
+    alert('Vui lòng nhập đủ: Tên người vay, Số tiền hợp lệ, và Ngày cho vay.');
+    return;
+  }
+
+  const btn = document.getElementById('lendingAddBtn');
+  btn.disabled = true; btn.textContent = 'Đang lưu...';
+  google.script.run
+    .withSuccessHandler((res) => {
+      btn.disabled = false; btn.textContent = '💾 Lưu';
+      if (res && res.success){
+        document.getElementById('lendingBorrowerInput').value = '';
+        document.getElementById('lendingAmountInput').value = '';
+        document.getElementById('lendingDueDateInput').value = '';
+        document.getElementById('lendingNoteInput').value = '';
+        document.getElementById('lendingDateInput').value = todayStr();
+        loadLendingReport();
+      } else {
+        alert('❌ ' + (res && res.message ? res.message : 'Có lỗi xảy ra.'));
+      }
+    })
+    .withFailureHandler((err) => {
+      btn.disabled = false; btn.textContent = '💾 Lưu';
+      alert('❌ Lỗi: ' + (err && err.message ? err.message : err));
+    })
+    .addLendingEntry({ borrower, amount, lendDate, dueDate, note });
+});
+
+// ============================================================
+// THEO DÕI LOTTERY (CHUSEN) & CHẤM PSA
+// ============================================================
+function loadTrackingReport(){
+  google.script.run
+    .withSuccessHandler(onTrackingLoaded)
+    .withFailureHandler((err) => console.error('getTrackingReport failed:', err))
+    .getTrackingReport();
+}
+
+function onTrackingLoaded(data){
+  if (!data || data.success === false) { console.error(data); return; }
+
+  const alertBox = document.getElementById('trackingOverdueAlert');
+  if (data.overdueCount > 0){
+    alertBox.className = 'budget-alert warn show';
+    alertBox.innerHTML = `⚠️ Có ${data.overdueCount} đơn Lottery/PSA đã trễ hẹn về hàng — kiểm tra lại tình trạng vận chuyển.`;
+  } else {
+    alertBox.className = 'budget-alert'; alertBox.innerHTML = '';
+  }
+
+  const body = document.getElementById('trackingBody');
+  const empty = document.getElementById('trackingEmpty');
+  if (!data.items.length){ body.innerHTML = ''; empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+  body.innerHTML = data.items.map(it => {
+    const status = !it.isWaiting ? '✅ Đã về hàng' : (it.isOverdue ? '⚠️ Trễ hẹn' : '⏳ Đang chờ');
+    const icon = it.type === 'Chấm PSA' ? '🎴' : '🎟️';
+    return `
+    <tr class="${it.isOverdue ? 'stale-row' : ''}">
+      <td>${icon} ${it.type}</td>
+      <td>${it.name}</td>
+      <td style="text-align:right;">${fmt(it.amount)}</td>
+      <td>${it.expectedDate || '–'}</td>
+      <td>${status}</td>
+      <td>${it.isWaiting ? `<button type="button" class="mini-btn" data-row="${it.rowIndex}">Đã về</button>` : ''}</td>
+    </tr>`;
+  }).join('');
+  body.querySelectorAll('.mini-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      btn.disabled = true; btn.textContent = '...';
+      google.script.run
+        .withSuccessHandler(() => loadTrackingReport())
+        .withFailureHandler((err) => { console.error(err); btn.disabled = false; btn.textContent = 'Đã về'; })
+        .markTrackingArrived(Number(btn.getAttribute('data-row')));
+    });
+  });
+}
+
+document.getElementById('trackingAddBtn').addEventListener('click', () => {
+  const type = document.getElementById('trackingTypeInput').value;
+  const name = document.getElementById('trackingNameInput').value.trim();
+  const amount = Number(document.getElementById('trackingAmountInput').value);
+  const recordDate = document.getElementById('trackingDateInput').value;
+  const expectedDate = document.getElementById('trackingExpectedInput').value;
+  const note = document.getElementById('trackingNoteInput').value.trim();
+
+  if (!name || !amount || amount <= 0 || !recordDate){
+    alert('Vui lòng nhập đủ: Tên sản phẩm, Số tiền hợp lệ, và Ngày trả tiền.');
+    return;
+  }
+
+  const btn = document.getElementById('trackingAddBtn');
+  btn.disabled = true; btn.textContent = 'Đang lưu...';
+  google.script.run
+    .withSuccessHandler((res) => {
+      btn.disabled = false; btn.textContent = '💾 Lưu';
+      if (res && res.success){
+        document.getElementById('trackingNameInput').value = '';
+        document.getElementById('trackingAmountInput').value = '';
+        document.getElementById('trackingExpectedInput').value = '';
+        document.getElementById('trackingNoteInput').value = '';
+        document.getElementById('trackingDateInput').value = todayStr();
+        loadTrackingReport();
+        loadProductNamesDash();
+        loadCategoryTrend(); // chi phí Lottery/PSA mới có thể ảnh hưởng biểu đồ xu hướng danh mục
+      } else {
+        alert('❌ ' + (res && res.message ? res.message : 'Có lỗi xảy ra.'));
+      }
+    })
+    .withFailureHandler((err) => {
+      btn.disabled = false; btn.textContent = '💾 Lưu';
+      alert('❌ Lỗi: ' + (err && err.message ? err.message : err));
+    })
+    .addTrackingEntry({ type, name, amount, recordDate, expectedDate, note });
+});
+
+function loadProductNamesDash(){
+  google.script.run
+    .withSuccessHandler((names) => {
+      document.getElementById('productNameListDash').innerHTML =
+        (names || []).map(n => `<option value="${n.replace(/"/g, '&quot;')}">`).join('');
+    })
+    .withFailureHandler((err) => console.error('getKnownProductNames failed:', err))
+    .getKnownProductNames();
+}
+
+document.getElementById('lendingDateInput').value = todayStr();
+document.getElementById('trackingDateInput').value = todayStr();
+
+// ============================================================
+// CÀI ĐẶT: EMAIL NHẬN BÁO CÁO
+// ============================================================
+function loadReportEmail(){
+  google.script.run
+    .withSuccessHandler((email) => { document.getElementById('reportEmailInput').value = email || ''; })
+    .withFailureHandler((err) => console.error('getReportRecipientEmailValue failed:', err))
+    .getReportRecipientEmailValue();
+}
+
+document.getElementById('reportEmailSaveBtn').addEventListener('click', () => {
+  const email = document.getElementById('reportEmailInput').value.trim();
+  const btn = document.getElementById('reportEmailSaveBtn');
+  btn.disabled = true; btn.textContent = 'Đang lưu...';
+  google.script.run
+    .withSuccessHandler((res) => {
+      btn.disabled = false; btn.textContent = '💾 Lưu';
+      alert(res && res.success ? '✅ ' + res.message : '❌ ' + (res && res.message ? res.message : 'Có lỗi xảy ra.'));
+    })
+    .withFailureHandler((err) => {
+      btn.disabled = false; btn.textContent = '💾 Lưu';
+      alert('❌ Lỗi: ' + (err && err.message ? err.message : err));
+    })
+    .saveReportRecipientEmail(email);
+});
+
+loadData(null);
+loadTenpaiReport();
+loadCategoryTrend();
+loadLendingReport();
+loadTrackingReport();
+loadProductNamesDash();
+loadReportEmail();
+</script>
+</body>
+</html>

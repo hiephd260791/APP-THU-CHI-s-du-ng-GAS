@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --income:#16A34A; --income-light:#DCFCE7;
+      --expense:#DC2626; --expense-light:#FEE2E2;
+      --bg:#F5F7FB; --card:#FFFFFF; --border:#E5E7EB;
+      --text:#111827; --muted:#6B7280; --accent:#4F46E5;
+    }
+    *{box-sizing:border-box;}
+    body{
+      margin:0; background:var(--bg); color:var(--text);
+      font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+      -webkit-font-smoothing:antialiased;
+    }
+    .wrap{max-width:460px; margin:0 auto; padding:18px 16px 40px;}
+    h1{font-size:19px; font-weight:800; text-align:center; margin:6px 0 16px;}
+
+    .type-toggle{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px;}
+    .type-btn{
+      padding:14px; border-radius:14px; border:2px solid var(--border); background:var(--card);
+      font-size:15px; font-weight:700; cursor:pointer; text-align:center; color:var(--muted);
+      transition:all .15s ease;
+    }
+    .type-btn.active.expense{border-color:var(--expense); background:var(--expense-light); color:var(--expense);}
+    .type-btn.active.income{border-color:var(--income); background:var(--income-light); color:var(--income);}
+
+    .section{background:var(--card); border:1px solid var(--border); border-radius:16px; padding:16px; margin-bottom:14px;}
+    .section-label{font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.03em; color:var(--muted); margin-bottom:10px;}
+
+    .cat-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:8px;}
+    .cat-btn{
+      display:flex; flex-direction:column; align-items:center; gap:4px;
+      padding:12px 4px; border-radius:12px; border:2px solid var(--border); background:#FAFAFB;
+      cursor:pointer; font-size:11.5px; font-weight:600; color:var(--text); text-align:center;
+      line-height:1.2; transition:all .15s ease;
+    }
+    .cat-btn .icon{font-size:22px;}
+    .cat-btn.selected{border-color:var(--accent); background:#EEF2FF; color:var(--accent);}
+
+    .amount-input{
+      width:100%; font-size:30px; font-weight:800; text-align:center; border:none; background:transparent;
+      color:var(--text); padding:6px 0;
+    }
+    .amount-input:focus{outline:none;}
+    .quick-amounts{display:flex; gap:8px; flex-wrap:wrap; justify-content:center; margin-top:6px;}
+    .quick-btn{
+      padding:7px 12px; border-radius:999px; border:1px solid var(--border); background:#FAFAFB;
+      font-size:12.5px; font-weight:600; cursor:pointer; color:var(--text);
+    }
+    .quick-btn:active{background:#EEF2FF;}
+    .clear-btn{
+      display:block; margin:8px auto 0; font-size:12px; color:var(--muted); background:none; border:none; cursor:pointer; text-decoration:underline;
+    }
+
+    input[type=date], input[type=text], select{
+      width:100%; padding:11px 12px; border-radius:10px; border:1px solid var(--border);
+      font-size:14px; font-family:inherit; background:#FAFAFB; color:var(--text);
+    }
+    input[type=date]:focus, input[type=text]:focus, select:focus{outline:2px solid var(--accent); outline-offset:1px; background:#fff;}
+
+    .submit-btn{
+      width:100%; padding:15px; border-radius:14px; border:none; background:var(--accent); color:#fff;
+      font-size:16px; font-weight:800; cursor:pointer; margin-top:4px;
+    }
+    .submit-btn:disabled{background:#C7C9D9; cursor:not-allowed;}
+    .submit-btn.expense-mode{background:var(--expense);}
+    .submit-btn.income-mode{background:var(--income);}
+
+    .toast{
+      position:fixed; left:50%; bottom:24px; transform:translateX(-50%) translateY(20px);
+      background:#111827; color:#fff; padding:11px 18px; border-radius:10px; font-size:13.5px; font-weight:600;
+      opacity:0; transition:all .25s ease; pointer-events:none; max-width:90%; text-align:center;
+    }
+    .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+    .toast.error{background:var(--expense);}
+
+    .link-dashboard{display:block; text-align:center; margin-top:14px; font-size:13px; color:var(--accent); font-weight:600; text-decoration:none; cursor:pointer;}
+    .error-msg{color:var(--expense); font-size:12.5px; font-weight:600; margin-top:6px; display:none;}
+    .hint-msg{color:var(--muted); font-size:12.5px; margin-top:6px;}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>✏️ Nhập chi tiêu nhanh</h1>
+
+    <div class="type-toggle">
+      <button type="button" class="type-btn expense active" data-type="expense">💸 Chi tiêu</button>
+      <button type="button" class="type-btn income" data-type="income">💰 Thu nhập</button>
+    </div>
+
+    <div class="section">
+      <div class="section-label">Danh mục</div>
+      <div class="cat-grid" id="catGrid"></div>
+      <div class="error-msg" id="catError">Vui lòng chọn danh mục.</div>
+    </div>
+
+    <div class="section" id="productNameSection" style="display:none;">
+      <div class="section-label" id="productNameLabel">📦 Tên sản phẩm (để tính lời lãi Tenpai)</div>
+      <input type="text" id="productNameInput" list="productNameList" placeholder="VD: Box kỷ niệm 30 năm" autocomplete="off">
+      <datalist id="productNameList"></datalist>
+      <div class="hint-msg" id="productNameOptionalHint" style="display:none;">Bóc pack mù — có thể để trống nếu chưa biết trúng thẻ gì, điền tên thẻ sau nếu biết ngay.</div>
+      <div class="error-msg" id="productNameError">Vui lòng nhập tên sản phẩm — dùng để khớp lời lãi giữa lần mua và lần bán, nhập giống hệt cho cùng 1 món (gõ vài ký tự để xem gợi ý tên đã có).</div>
+    </div>
+
+    <div class="section" id="trackingFieldsSection" style="display:none;">
+      <div class="section-label">🎯 Theo dõi Lottery / PSA</div>
+      <select id="trackingTypeInput" style="margin-bottom:10px;">
+        <option value="Lottery (Chusen)">🎟️ Lottery (Chusen)</option>
+        <option value="Chấm PSA">🎴 Chấm PSA</option>
+      </select>
+      <div class="section-label" style="margin-top:2px;">Ngày dự kiến về hàng (không bắt buộc)</div>
+      <input type="date" id="trackingExpectedInput">
+      <div class="hint-msg">Chấm PSA thường mất khoảng 4-5 tháng, Lottery thường vài tuần — đã tự điền gợi ý, bạn có thể sửa lại. Khoản chi này sẽ tự hiện trong mục "Theo dõi Lottery/PSA" ở Dashboard để bạn theo dõi ngày về.</div>
+    </div>
+
+    <div class="section">
+      <div class="section-label">Số tiền (¥)</div>
+      <input type="text" inputmode="numeric" class="amount-input" id="amountInput" placeholder="0" value="">
+      <div class="quick-amounts">
+        <button type="button" class="quick-btn" data-add="1000">+1,000</button>
+        <button type="button" class="quick-btn" data-add="3000">+3,000</button>
+        <button type="button" class="quick-btn" data-add="5000">+5,000</button>
+        <button type="button" class="quick-btn" data-add="10000">+10,000</button>
+      </div>
+      <button type="button" class="clear-btn" id="clearAmount">Xoá số tiền</button>
+      <div class="error-msg" id="amountError">Vui lòng nhập số tiền hợp lệ.</div>
+    </div>
+
+    <div class="section">
+      <div class="section-label">Ngày</div>
+      <input type="date" id="dateInput">
+    </div>
+
+    <div class="section">
+      <div class="section-label">Ghi chú (không bắt buộc)</div>
+      <input type="text" id="noteInput" placeholder="VD: mua ở Ionmall...">
+    </div>
+
+    <button type="button" class="submit-btn expense-mode" id="submitBtn">💾 Lưu giao dịch</button>
+    <a class="link-dashboard" id="dashboardLink">📊 Xem Dashboard</a>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+<script>
+const CATEGORY_ICONS = {
+  'Tiền lương':'💼','Tiền thưởng':'🎁','Tiền tenpai':'🛍️',
+  'Tiền siêu thị':'🛒','Tiền combini':'🏪','Tiền xăng':'⛽','Tiền dầu xe ô tô':'🛢️',
+  'Tiền điện':'⚡','Nước':'💧','Gas':'🔥','Internet':'🌐','Điện thoại':'📱',
+  'Tiền mua đồ tenpai':'📦','Tiền gửi chăm con':'👶','Tiền gửi bố mẹ':'👨‍👩‍👧','Tiền ăn với công ty':'🍱',
+  'Tiền lottery/PSA tenpai':'🎟️','Tiền bóc pack combini':'🎴'
+};
+
+let categories = { income: [], expense: [] };
+let tenpaiCategories = [];
+let optionalProductNameCategories = [];
+let currentType = 'expense';
+let selectedCategory = null;
+// Phải khớp CHÍNH XÁC với hằng số TENPAI_LOTTERY_CATEGORY bên Code.gs.
+const TENPAI_LOTTERY_CATEGORY = 'Tiền lottery/PSA tenpai';
+
+function todayStr(){
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2,'0');
+  return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate());
+}
+document.getElementById('dateInput').value = todayStr();
+
+function updateProductNameVisibility(){
+  const section = document.getElementById('productNameSection');
+  const show = tenpaiCategories.includes(selectedCategory);
+  section.style.display = show ? 'block' : 'none';
+  if (!show) {
+    document.getElementById('productNameInput').value = '';
+    document.getElementById('productNameError').style.display = 'none';
+    document.getElementById('productNameOptionalHint').style.display = 'none';
+    return;
+  }
+  const isOptional = optionalProductNameCategories.includes(selectedCategory);
+  document.getElementById('productNameLabel').textContent = isOptional
+    ? '📦 Tên thẻ/sản phẩm (không bắt buộc)'
+    : '📦 Tên sản phẩm (để tính lời lãi Tenpai)';
+  document.getElementById('productNameOptionalHint').style.display = isOptional ? 'block' : 'none';
+}
+
+function updateTrackingFieldsVisibility(){
+  const section = document.getElementById('trackingFieldsSection');
+  const show = selectedCategory === TENPAI_LOTTERY_CATEGORY;
+  section.style.display = show ? 'block' : 'none';
+  if (show) {
+    suggestExpectedDate();
+  } else {
+    document.getElementById('trackingExpectedInput').value = '';
+    document.getElementById('trackingTypeInput').value = 'Lottery (Chusen)';
+  }
+}
+
+/** Tự gợi ý ngày dự kiến về hàng dựa theo Loại (PSA ~4.5 tháng, Lottery ~1 tháng) —
+ * chỉ điền khi ô đang trống, không ghi đè ngày người dùng đã tự chọn. */
+function suggestExpectedDate(){
+  const input = document.getElementById('trackingExpectedInput');
+  if (input.value) return;
+  const type = document.getElementById('trackingTypeInput').value;
+  const days = type === 'Chấm PSA' ? 135 : 30;
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  const pad = (n) => String(n).padStart(2, '0');
+  input.value = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+}
+document.getElementById('trackingTypeInput').addEventListener('change', () => {
+  document.getElementById('trackingExpectedInput').value = ''; // đổi loại -> tính lại gợi ý từ đầu
+  suggestExpectedDate();
+});
+
+function renderCategories(){
+  const list = categories[currentType] || [];
+  const grid = document.getElementById('catGrid');
+  grid.innerHTML = list.map(cat => `
+    <button type="button" class="cat-btn ${cat === selectedCategory ? 'selected' : ''}" data-cat="${cat}">
+      <span class="icon">${CATEGORY_ICONS[cat] || '📌'}</span>
+      <span>${cat}</span>
+    </button>`).join('');
+  grid.querySelectorAll('.cat-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      selectedCategory = btn.getAttribute('data-cat');
+      document.getElementById('catError').style.display = 'none';
+      renderCategories();
+      updateProductNameVisibility();
+      updateTrackingFieldsVisibility();
+    });
+  });
+}
+
+document.querySelectorAll('.type-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    currentType = btn.getAttribute('data-type');
+    selectedCategory = null;
+    document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const submitBtn = document.getElementById('submitBtn');
+    submitBtn.classList.toggle('expense-mode', currentType === 'expense');
+    submitBtn.classList.toggle('income-mode', currentType === 'income');
+    renderCategories();
+    updateProductNameVisibility();
+    updateTrackingFieldsVisibility();
+  });
+});
+
+const amountInput = document.getElementById('amountInput');
+amountInput.addEventListener('input', () => {
+  amountInput.value = amountInput.value.replace(/[^0-9]/g, '');
+  document.getElementById('amountError').style.display = 'none';
+});
+document.getElementById('productNameInput').addEventListener('input', () => {
+  document.getElementById('productNameError').style.display = 'none';
+});
+document.querySelectorAll('.quick-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const current = Number(amountInput.value || 0);
+    amountInput.value = current + Number(btn.getAttribute('data-add'));
+    document.getElementById('amountError').style.display = 'none';
+  });
+});
+document.getElementById('clearAmount').addEventListener('click', () => { amountInput.value = ''; });
+
+function showToast(message, isError){
+  const toast = document.getElementById('toast');
+  toast.textContent = message;
+  toast.className = 'toast show' + (isError ? ' error' : '');
+  setTimeout(() => { toast.className = 'toast'; }, 2600);
+}
+
+document.getElementById('submitBtn').addEventListener('click', () => {
+  const amount = Number(amountInput.value);
+  let hasError = false;
+
+  if (!selectedCategory){
+    document.getElementById('catError').style.display = 'block';
+    hasError = true;
+  }
+  if (!amount || amount <= 0){
+    document.getElementById('amountError').style.display = 'block';
+    hasError = true;
+  }
+
+  const needsProductName = tenpaiCategories.includes(selectedCategory) && !optionalProductNameCategories.includes(selectedCategory);
+  const productName = document.getElementById('productNameInput').value.trim();
+  if (needsProductName && !productName){
+    document.getElementById('productNameError').style.display = 'block';
+    hasError = true;
+  }
+
+  if (hasError) return;
+
+  const isLotteryPsa = selectedCategory === TENPAI_LOTTERY_CATEGORY;
+  const dateVal = document.getElementById('dateInput').value;
+  const note = document.getElementById('noteInput').value.trim();
+
+  const submitBtn = document.getElementById('submitBtn');
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Đang lưu...';
+
+  function onSaveDone(res){
+    submitBtn.disabled = false;
+    submitBtn.textContent = '💾 Lưu giao dịch';
+    if (res && res.success){
+      showToast('✅ Đã lưu ' + (currentType === 'income' ? 'thu nhập' : 'chi tiêu') + ': ¥' + amount.toLocaleString('ja-JP'));
+      amountInput.value = '';
+      document.getElementById('noteInput').value = '';
+      document.getElementById('productNameInput').value = '';
+      document.getElementById('trackingExpectedInput').value = '';
+      selectedCategory = null;
+      renderCategories();
+      updateProductNameVisibility();
+      updateTrackingFieldsVisibility();
+      if (productName) loadProductNames(); // vừa nhập tên mới -> nạp lại gợi ý autocomplete
+    } else {
+      showToast('❌ ' + (res && res.message ? res.message : 'Có lỗi xảy ra.'), true);
+    }
+  }
+
+  function onSaveFailed(err){
+    submitBtn.disabled = false;
+    submitBtn.textContent = '💾 Lưu giao dịch';
+    showToast('❌ Lỗi: ' + (err && err.message ? err.message : err), true);
+  }
+
+  if (isLotteryPsa) {
+    // Danh mục Lottery/PSA đi qua addTrackingEntry() để vừa ghi chi phí vào Transactions,
+    // vừa tạo 1 dòng theo dõi ngày dự kiến về hàng trong sheet TheoDoiHang cùng lúc.
+    google.script.run
+      .withSuccessHandler(onSaveDone)
+      .withFailureHandler(onSaveFailed)
+      .addTrackingEntry({
+        type: document.getElementById('trackingTypeInput').value,
+        name: productName,
+        amount: amount,
+        recordDate: dateVal,
+        expectedDate: document.getElementById('trackingExpectedInput').value,
+        note: note
+      });
+  } else {
+    google.script.run
+      .withSuccessHandler(onSaveDone)
+      .withFailureHandler(onSaveFailed)
+      .addTransaction({
+        type: currentType,
+        category: selectedCategory,
+        amount: amount,
+        date: dateVal,
+        note: note,
+        productName: productName
+      });
+  }
+});
+
+document.getElementById('dashboardLink').addEventListener('click', () => {
+  google.script.run.withSuccessHandler((url) => {
+    if (url) window.open(url, '_blank');
+    else alert('Web app chưa được deploy. Hãy dùng menu 💰 Quản lý chi tiêu > 📊 Mở Dashboard trong Google Sheet.');
+  }).getWebAppUrl();
+});
+
+function showCatGridMessage(html){
+  const grid = document.getElementById('catGrid');
+  grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;color:#DC2626;font-size:12.5px;padding:10px 4px;line-height:1.5;">${html}<br>
+    <button type="button" class="quick-btn" id="retryCatBtn" style="margin-top:8px;">🔄 Thử tải lại</button></div>`;
+  document.getElementById('retryCatBtn').addEventListener('click', loadCategories);
+}
+
+function loadCategories(){
+  document.getElementById('catGrid').innerHTML =
+    '<div style="grid-column:1/-1;text-align:center;color:#9CA3AF;font-size:12.5px;padding:10px 0;">Đang tải danh mục...</div>';
+
+  google.script.run
+    .withSuccessHandler((cats) => {
+      categories = cats || { income: [], expense: [] };
+      tenpaiCategories = (cats && cats.tenpaiCategories) || [];
+      optionalProductNameCategories = (cats && cats.optionalProductNameCategories) || [];
+      if ((categories.income || []).length === 0 && (categories.expense || []).length === 0) {
+        // getCategories() chạy thành công nhưng không thấy dữ liệu nào — thường do sheet
+        // "Settings" bị đổi tên, hoặc cột A/B (Thu nhập/Chi tiêu) đang trống từ dòng 2 trở xuống.
+        showCatGridMessage('Không tìm thấy danh mục nào trong sheet "Settings" (cột A = Thu nhập, cột B = Chi tiêu, bắt đầu từ dòng 2). Kiểm tra lại tên sheet và dữ liệu.');
+        return;
+      }
+      renderCategories();
+    })
+    .withFailureHandler((err) => {
+      console.error('getCategories failed:', err);
+      showCatGridMessage('Lỗi khi gọi getCategories(): ' + (err && err.message ? err.message : err));
+    })
+    .getCategories();
+}
+
+function loadProductNames(){
+  google.script.run
+    .withSuccessHandler((names) => {
+      document.getElementById('productNameList').innerHTML =
+        (names || []).map(n => `<option value="${n.replace(/"/g, '&quot;')}">`).join('');
+    })
+    .withFailureHandler((err) => console.error('getKnownProductNames failed:', err))
+    .getKnownProductNames();
+}
+
+loadCategories();
+loadProductNames();
+</script>
+</body>
+</html>
